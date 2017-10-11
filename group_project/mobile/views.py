@@ -1,24 +1,27 @@
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
+from django.contrib.gis.geos import Point, Polygon
 
-import rest_framework
 from rest_framework import serializers
+from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.serializers import ModelSerializer
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from mobile.models import UserProfile
+from .constants import GEOFENCE_BOUNDS, UNKNOWN_GEOFENCE
 
 
-class UserListSerializer(serializers.ModelSerializer):
+class UserListSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'password', 'email', 'first_name', 'last_name')
 
 
-class UserLoginSerializer(serializers.ModelSerializer):
+class UserLoginSerializer(ModelSerializer):
 
     password = serializers.CharField(
         required=False, style={'input_type': 'password'}
@@ -41,7 +44,6 @@ class UserLoginSerializer(serializers.ModelSerializer):
             username=data.get('username'),
             password=data.get('password')
         )
-        #
         self._validate_user_exists(self.user)
         self._validate_user_is_active(self.user)
         return data
@@ -59,7 +61,7 @@ class UserLoginSerializer(serializers.ModelSerializer):
         fields = ('username', 'password')
 
 
-class UserProfileSerializer(serializers.ModelSerializer):
+class UserProfileSerializer(ModelSerializer):
     user = UserListSerializer()
 
     class Meta:
@@ -68,16 +70,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user_data = validated_data.pop('user')
-        print(user_data)
         base_user = User.objects.create_user(**user_data)
         account = UserProfile.objects.get_or_create(user=base_user, **validated_data)[0]
         return account
 
 
-class Register(ModelViewSet):
-    permission_classes = [
-        rest_framework.permissions.AllowAny
-    ]
+class UserCreateAPIView(CreateAPIView):
+    permission_classes = [AllowAny]
     queryset = UserProfile.objects.all()
     serializer_class = UserProfileSerializer
 
@@ -91,5 +90,14 @@ class UserLoginAPIView(APIView):
         serializer = UserLoginSerializer(data=data)
         if serializer.is_valid(raise_exception=True):
             new_data = serializer.data
-            return Response(new_data,status=HTTP_200_OK)
+            return Response(new_data, status=HTTP_200_OK)
         return Response(serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+
+def assign_geofence(lat, long):
+    point = Point(lat, long)
+    for area in GEOFENCE_BOUNDS:
+        polygon = Polygon([(point['lat'], point['long']) for point in GEOFENCE_BOUNDS[area]])
+        if polygon.contains(point):
+            return area
+    return UNKNOWN_GEOFENCE
