@@ -9,9 +9,8 @@ from rest_framework.response import Response
 from rest_framework.serializers import ModelSerializer
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from rest_framework.views import APIView
-from rest_framework.viewsets import ModelViewSet
 
-from mobile.models import UserProfile
+from mobile.models import UserProfile, LocationDensity, GroupLocalization
 from .constants import GEOFENCE_BOUNDS, UNKNOWN_GEOFENCE
 
 
@@ -19,6 +18,26 @@ class UserListSerializer(ModelSerializer):
     class Meta:
         model = User
         fields = ('username', 'password', 'email', 'first_name', 'last_name')
+
+
+class UserProfileSerializer(ModelSerializer):
+    user = UserListSerializer()
+
+    class Meta:
+        model = UserProfile
+        fields = ('user', 'gender', 'imei', 'bt_name')
+
+    def create(self, validated_data):
+        user_data = validated_data.pop('user')
+        base_user = User.objects.create_user(**user_data)
+        account = UserProfile.objects.get_or_create(user=base_user, **validated_data)[0]
+        return account
+
+
+class UserCreateAPIView(CreateAPIView):
+    permission_classes = [AllowAny]
+    queryset = UserProfile.objects.all()
+    serializer_class = UserProfileSerializer
 
 
 class UserLoginSerializer(ModelSerializer):
@@ -61,26 +80,6 @@ class UserLoginSerializer(ModelSerializer):
         fields = ('username', 'password')
 
 
-class UserProfileSerializer(ModelSerializer):
-    user = UserListSerializer()
-
-    class Meta:
-        model = UserProfile
-        fields = ('user', 'gender', 'imei', 'bt_name')
-
-    def create(self, validated_data):
-        user_data = validated_data.pop('user')
-        base_user = User.objects.create_user(**user_data)
-        account = UserProfile.objects.get_or_create(user=base_user, **validated_data)[0]
-        return account
-
-
-class UserCreateAPIView(CreateAPIView):
-    permission_classes = [AllowAny]
-    queryset = UserProfile.objects.all()
-    serializer_class = UserProfileSerializer
-
-
 class UserLoginAPIView(APIView):
     permission_classes = [AllowAny]
     serializer_class = UserLoginSerializer
@@ -92,6 +91,30 @@ class UserLoginAPIView(APIView):
             new_data = serializer.data
             return Response(new_data, status=HTTP_200_OK)
         return Response(serializer.errors, status=HTTP_400_BAD_REQUEST)
+
+
+class LocationDensitySerializer(ModelSerializer):
+    class Meta:
+        model = LocationDensity
+        fields = '__all__'
+
+
+class LocationDensityAPIView(CreateAPIView):
+    permission_classes = [AllowAny]
+    queryset = LocationDensity.objects.all()
+    serializer_class = LocationDensitySerializer
+
+
+class GroupLocalizationSerializer(ModelSerializer):
+    class Meta:
+        model = GroupLocalization
+        fields = '__all__'
+
+
+class GroupLocalizationAPIView(CreateAPIView):
+    permission_classes = [AllowAny]
+    queryset = GroupLocalization.objects.all()
+    serializer_class = GroupLocalizationSerializer
 
 
 def assign_geofence(lat, long):
