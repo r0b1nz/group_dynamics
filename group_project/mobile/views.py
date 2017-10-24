@@ -12,7 +12,7 @@ from rest_framework.serializers import ModelSerializer
 from rest_framework.status import HTTP_200_OK, HTTP_400_BAD_REQUEST
 from rest_framework.views import APIView
 
-from mobile.models import UserProfile, LocationDensity, GroupLocalization
+from .models import UserProfile, LocationDensity, GroupLocalization
 from .constants import GEOFENCE_BOUNDS, UNKNOWN_GEOFENCE
 
 

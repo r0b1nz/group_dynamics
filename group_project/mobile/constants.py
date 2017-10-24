@@ -2,7 +2,7 @@ UNKNOWN_GEOFENCE = 'GEOFENCE_24'
 
 GEOFENCE_NAMES = {
     'GEOFENCE_1': 'Kurukshetra_Hostel',
-    'GEOFENCE_2': 'Himalays_Hostel',
+    'GEOFENCE_2': 'Himalaya_Hostel',
     'GEOFENCE_3': 'Vindhya_Hostel',
     'GEOFENCE_4': 'Aravali_Hostel',
     'GEOFENCE_5': 'PEC_Market',
