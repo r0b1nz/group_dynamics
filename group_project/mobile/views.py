@@ -1,8 +1,10 @@
+from datetime import datetime
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point, Polygon
 
-from rest_framework import serializers
+from rest_framework import serializers, permissions
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -99,28 +101,47 @@ class LocationDensitySerializer(ModelSerializer):
         fields = '__all__'
 
 
-class LocationDensityAPIView(CreateAPIView):
-    permission_classes = [AllowAny]
-    queryset = LocationDensity.objects.all()
-    serializer_class = LocationDensitySerializer
-
-
 class GroupLocalizationSerializer(ModelSerializer):
     class Meta:
         model = GroupLocalization
         fields = '__all__'
 
 
-class GroupLocalizationAPIView(CreateAPIView):
-    permission_classes = [AllowAny]
-    queryset = GroupLocalization.objects.all()
-    serializer_class = GroupLocalizationSerializer
+@api_view(['POST'])
+@permission_classes((permissions.AllowAny,))
+def assign_groups(request):
+    json = request.data
+    if request.method == 'POST':
+        username = json.keys()[0]
+        data = json.values()[0]
+        for entry in data:
+            user = User.objects.get(username=username)
+            timestamp = datetime.combine(
+                datetime.strptime(entry['date'], '%d/%m/%Y').date(),
+                datetime.strptime(entry['time'], '%H:%M').time()
+            )
+            GroupLocalization.objects.create(
+                user=UserProfile.objects.get(user=user),
+                timestamp=timestamp,
+                group=str(entry['group'])
+            )
+            location = assign_geofence(entry['location']['lat'], entry['location']['long'])
+            if LocationDensity.objects.filter(timestamp=timestamp, location=location).exists():
+                loc_obj = LocationDensity.objects.get(timestamp=timestamp, location=location)
+                loc_obj.density += 1
+                loc_obj.save()
+            else:
+                LocationDensity.objects.create(timestamp=timestamp, location=location, density=1)
+        return Response({"message": "Got some data!", "data": request.data})
+    return Response({"message": "Data format inaccurate !!!!!"})
 
 
 def assign_geofence(lat, long):
-    point = Point(lat, long)
+    coordinates = Point(float(lat), float(long))
     for area in GEOFENCE_BOUNDS:
-        polygon = Polygon([(point['lat'], point['long']) for point in GEOFENCE_BOUNDS[area]])
-        if polygon.contains(point):
+        points_list = [(point['lat'], point['long']) for point in GEOFENCE_BOUNDS[area]]
+        points_list.append(points_list[0])
+        polygon = Polygon(points_list)
+        if polygon.contains(coordinates):
             return area
     return UNKNOWN_GEOFENCE

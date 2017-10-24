@@ -13,12 +13,17 @@ class UserProfile(models.Model):
 
 
 class LocationDensity(models.Model):
-    timestamp = models.DateTimeField(unique=True)
     location = models.CharField(max_length=12, blank=False)
+    timestamp = models.DateTimeField(blank=False)
     density = models.IntegerField(default=0)
 
 
 class GroupLocalization(models.Model):
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, blank=False)
-    timestamp = models.TimeField(blank=False)
-    group = models.CharField(max_length=500)
+    timestamp = models.DateTimeField(blank=False)
+    group = models.CharField(max_length=100)
+
+
+class DailyMatrix(models.Model):
+    date = models.DateField(blank=False)
+    group = models.TextField()
