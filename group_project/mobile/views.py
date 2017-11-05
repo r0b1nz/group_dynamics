@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
@@ -90,21 +91,22 @@ class UserLoginAPIView(APIView):
         data = request.data
         serializer = UserLoginSerializer(data=data)
         if serializer.is_valid(raise_exception=True):
-            new_data = serializer.data
-            return Response(new_data, status=HTTP_200_OK)
+            user = User.objects.get(username=serializer.data.get('username'))
+            user_data = {'user_id': user.id}
+            return Response(user_data, status=HTTP_200_OK)
         return Response(serializer.errors, status=HTTP_400_BAD_REQUEST)
 
 
-class LocationDensitySerializer(ModelSerializer):
-    class Meta:
-        model = LocationDensity
-        fields = '__all__'
-
-
-class GroupLocalizationSerializer(ModelSerializer):
-    class Meta:
-        model = GroupLocalization
-        fields = '__all__'
+# class LocationDensitySerializer(ModelSerializer):
+#     class Meta:
+#         model = LocationDensity
+#         fields = '__all__'
+#
+#
+# class GroupLocalizationSerializer(ModelSerializer):
+#     class Meta:
+#         model = GroupLocalization
+#         fields = '__all__'
 
 
 @api_view(['POST'])
@@ -116,9 +118,10 @@ def assign_groups(request):
         data = json.values()[0]
         for entry in data:
             user = User.objects.get(username=username)
+            time = entry['time'].split(':')[0] + ':' + entry['time'].split(':')[1]
             timestamp = datetime.combine(
                 datetime.strptime(entry['date'], '%d/%m/%Y').date(),
-                datetime.strptime(entry['time'], '%H:%M').time()
+                datetime.strptime(time, '%H:%M').time()
             )
             GroupLocalization.objects.create(
                 user=UserProfile.objects.get(user=user),
@@ -145,3 +148,17 @@ def assign_geofence(lat, long):
         if polygon.contains(coordinates):
             return area
     return UNKNOWN_GEOFENCE
+
+
+def data_analysis():
+    timestamp_set = {}
+    users = UserProfile.objects.all()
+    for obj in users:
+        identify_group(obj, timestamp_set)
+
+
+def identify_group(user, timestamp_set):
+    group_objects = GroupLocalization.objects.filter(user=user).order_by('timestamp')
+    for group_obj in group_objects:
+        group_dict = json.loads(group_obj.group)
+        timestamp_set[user.user.username] = group_dict
